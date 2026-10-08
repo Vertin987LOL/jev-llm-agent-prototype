@@ -1,50 +1,55 @@
-# Jev + LLM Agent（实验原型）
+# Jev + LLM Agent (experimental prototype)
 
-**状态：能运行，但实际任务效果还不理想。** 这不是稳定的浏览器代理，也没有证据表明它比主流模型原生工具调用更准确、更快或更便宜。我公开的是一个可修改的研究起点，希望有人帮忙设计实验、找问题、继续开发。
+English · [简体中文](README.zh-CN.md)
 
-> English: An experimental agent loop. An LLM proposes the next step in natural language; Jev maps that proposal onto a fixed action; code validates parameters, executes the tool, and returns real feedback. Tool selection, browser use, memory and recovery are not reliable yet. Contributions and controlled comparisons are welcome.
+**Status: runnable, but unreliable on real tasks.** This repository is primarily a research idea and an invitation to collaborate, not a claim that the agent outperforms native LLM tool calling in accuracy, speed, or cost.
 
-## 想法
+The code is a rough first pass meant to make the idea tangible. I am publishing it for others to fork, question, and continue; it is not a production project or a promise of ongoing development.
 
-传统工具调用通常让语言模型同时想下一步、选择工具、生成结构化参数。这里尝试拆开：
+## The idea: a feedback loop, not a one-shot tool call
 
-1. LLM 看到**当前目标、上一步真实结果、错误和简短印象**，用普通文字想“下一步做什么”。它不需要生成工具调用格式。
-2. Jev 把这段自然语言映射到固定选项：某个工具、直接回答、询问用户、停下等。Jev 是快速的选项映射器，不负责独立完成复杂推理。
-3. 选中工具后，LLM 再看到该工具的描述和参数规范，填写参数；代码按 JSON Schema 校验。MCP 工具调用需要用户确认。
-4. 程序执行一小步，把**实际结果或报错**交回 LLM；LLM 更新想法，再由 Jev 选下一步。循环直到能回答、必须追问、缺工具、被阻塞或达到步数上限。
+The LLM reads the goal, a compact impression of prior context, and the **actual result or error of the previous action**. It reasons in ordinary language about what to do next. Jev uses that thought as evidence to choose **one** action from a fixed set of tools and exits. Code validates parameters, executes the action, and sends its real feedback back to the LLM. Then the LLM thinks again. Repeat until the goal is answered, blocked, needs user input, or hits the step budget.
 
+```text
+Goal + working impression + actual result/error
+                    ↓
+       LLM reasons about the next step in natural language
+                    ↓
+       Jev maps that thought to a fixed action or exit
+          ↙                                  ↘
+ Existing tool: fill parameters,              Missing capability:
+ validate, execute                            cloud fallback / growth queue
+          ↓                                  ↓
+      Real feedback                   draft for review / blocked task
+          └──────────→ next LLM reasoning turn
 ```
-目标 + 短印象 + 真实反馈 → LLM 自然语言想法 → Jev 固定选项
-                                      ↓
-                       填参 → 校验 → 执行工具
-                                      ↓
-                              下一轮真实反馈
-```
 
-聊天第二轮起，旧内容会压成短印象；程序另外保留原始轮次和关键参数索引。需要旧细节时，可以选择 `list_memory`、`recall_history` 回查。摘要不是工具执行的证据。缺工具时可异步请求 DeepSeek 生成**待人工审核的草案**，不会自动安装或执行生成的代码。
+**The LLM plans; Jev maps natural-language intent to structured choices.** Jev is not asked to independently solve a complex task, and the LLM is not required to emit a particular keyword or a complete function-call envelope. Once a tool is chosen, the LLM still fills its parameters with the tool description, schema, and relevant context; code validates them. This split may reduce some formatting demands, but it does **not** eliminate reasoning errors, incorrect arguments, or Jev misclassification. It has not been fairly benchmarked against constrained native function calling.
 
-这只是文字形式的循环状态，不是模型隐藏层的连续思维。未来的语音输出、视觉动作和更快的“技能”层是设想，**当前没有实现**。
+The prototype exposes built-in read-only file tools and can discover MCP tools and their input schemas. MCP calls require confirmation. Chat history is compacted into a short impression while original turns remain available through `list_memory` and `recall_history`. A summary is not evidence that a tool actually ran.
 
-## 当前能做什么 / 哪里不稳
+## Self-growth: what happens when a tool is missing?
 
-- 有命令行和本地网页；内置少量只读文件工具，可从 MCP 工具目录自动读取描述与参数规范。
-- 本地 Ollama 模型负责参谋、填参和回答；也能切换 DeepSeek。Jev 负责固定选项选择。
-- 已有目标续跑、错误反馈、参数校验、工具确认、短印象与回查；定时心跳默认关闭，需要时手动开启。
-- **真实任务仍经常选错工具、误判任务完成、填错浏览器参数或在网页验证页卡住。** 小模型的建议可能误导 Jev；Jev 自身也可能错选。错误反馈和停止条件不是成功率保证。
-- 尚未完成与同一 LLM 原生 function calling 的公平对照。请不要把这个仓库当成性能或准确率的证明。
+The **proposed second loop** starts only when Jev identifies a genuine missing capability. A cloud LLM should first check whether Jev missed an existing tool, an alternative route is available, or the task simply cannot be done. If a capability is truly absent, record the goal, current thought, available tools, and recent failures in a growth queue. A separate cloud LLM can asynchronously draft a tool description, argument schema, implementation, and tests. **Only after human review, testing, and authorization** should the new tool enter the catalog for future tasks.
 
-## 希望有人一起做
+**What exists today:** `MISSING_TOOL` records a local draft request. With `DEEPSEEK_API_KEY`, a background worker may generate a draft marked for review; without a key it waits. The current task stops when the tool is missing. There is **no immediate cloud takeover of the task**, no automatic tool installation, and no learned capability until someone reviews and connects a real implementation. A cloud model cannot conjure access to a nonexistent API. Wrong tool selection, invalid arguments, and transient failures should instead feed back into the ordinary decision loop, not trigger growth.
 
-- 设计可复现的多步任务集，对照“LLM 原生工具调用”与“LLM + Jev”，分别量选工具正确率、任务成功率、延迟、调用成本。
-- 改善工具很多时的候选召回，且不依赖小模型输出固定格式；测漏召回和错选。
-- 研究每步短状态如何保留目标与关键事实，同时从原始记录按需回查；防止摘要幻觉被误认成事实。
-- 改进浏览器观察、参数填充、错误恢复、重复动作检测和安全边界。欢迎提供失败案例、最小复现、文档或代码。
+## Known limitations and useful contributions
 
-请先开 Issue 说明场景、原目标、实际选项和预期动作；提交 PR 时尽量附可复现用例。**不要上传包含密钥、登录态、私人网页或工具结果的日志。**
+Real tasks can select the wrong tool, declare completion too early, fill incorrect browser arguments, or get stuck on verification pages. Small-model advice can mislead Jev, and Jev itself can choose incorrectly. Error feedback and stop conditions do not guarantee recovery. This is a text-based state loop, not persistent latent-state cognition; faster reusable skills, visual actions, and speech are future ideas, not current features.
 
-## 运行
+If this architecture is interesting, contributions are especially welcome on:
 
-需要 Python 3.12+、Git、Ollama；浏览器扩展还需要 Node.js、Chrome 和 `chrome-devtools-mcp`。Jev 的 HTTP 客户端复用 [browser-use/jev-ultrafast](https://github.com/browser-use/jev-ultrafast)（MIT）；使用 Jev API 需自备 `TYPESAFE_API_KEY`。本仓库**不含模型权重或任何密钥**；请自行检查所用模型的许可证。
+- Reproducible multi-step comparisons with the **same LLM using native tool calls**, measuring task success, selection accuracy, retries, latency, and cost.
+- Candidate retrieval when there are many tools, without requiring the small LLM to output a rigid selection format.
+- Compact per-step state that preserves the goal and key facts, with retrieval from original observations rather than trusting summaries as evidence.
+- Safe missing-capability triage, reviewable tool drafts, parameter filling, browser observation, and recovery from repeated mistakes.
+
+Please open an Issue with the original goal, observed choice, expected next action, and a minimal reproduction. PRs with reproducible examples are welcome. **Do not upload keys, logged-in pages, private tool results, or local traces.**
+
+## Run locally
+
+Requires Python 3.12+, Git, Ollama, and your own Jev API key. Browser MCP support additionally requires Node.js, Chrome, and `chrome-devtools-mcp`. The Jev HTTP client uses [browser-use/jev-ultrafast](https://github.com/browser-use/jev-ultrafast) (MIT). **No model weights or secrets are included**; check each external model's license yourself.
 
 ```powershell
 py -3.12 -m venv .venv
@@ -54,22 +59,18 @@ $env:TYPESAFE_API_KEY = Read-Host "Jev API key"
 .\.venv\Scripts\python.exe -X utf8 .\web_ui.py --root .
 ```
 
-默认通过本机 Ollama 的 `qwen3:4b` 运行，设置 `ROBOT_MODEL` 可换成自己已安装的模型。所有本地模型请求设为 48K 上下文；这不表示模型在长上下文中一定可靠。命令行可用 `python agent.py --root . --chat`；`/goal <任务>` 启动持续目标，`/heartbeat on` 手动启用心跳。
+The default is local Ollama `qwen3:4b`; set `ROBOT_MODEL` for another installed model. Local requests use a 48K context setting, which does not imply reliable long-context attention. CLI: `python agent.py --root . --chat`; `/goal <task>` starts a persistent goal; `/heartbeat on` opts into periodic thinking (off by default).
 
-若想接入 Chrome MCP，复制 `mcp.chrome.example.json` 并按本机 Node.js 安装位置调整 `command`；例如 Windows 上可能需要改为 `npx.cmd` 或 Node 可执行文件，再使用 `--mcp-config <配置文件>`。该示例启动独立、无登录的无界面浏览器。MCP 服务具有自己的系统权限；每次调用前的确认**不是沙箱**。不要配置不可信的服务，也不要在隔离浏览器中输入账号。
+For browser tools, copy `mcp.chrome.example.json` to a private config and adjust the Node command for your machine (for example, `npx.cmd` on Windows), then pass `--mcp-config <file>`. The example launches an isolated, headless, logged-out browser. MCP servers run with their own OS permissions: confirmation is **not** a sandbox. Do not configure untrusted servers or enter account credentials into that browser.
 
-可选：设置 `AGENT_LLM_PROVIDER=deepseek` 和 `DEEPSEEK_API_KEY`，或运行 `Start-Jev-DeepSeek.ps1` 并交互式输入密钥。这样会把请求、相关工具结果和参数发给云端并产生费用。不要把密钥写入仓库或公开日志。
+Optionally set `AGENT_LLM_PROVIDER=deepseek` and `DEEPSEEK_API_KEY`, or run `Start-Jev-DeepSeek.ps1` for interactive key entry. This sends requests and relevant tool context to the cloud and may incur charges. Local traces are written under the user's application-data directory (`JevAgent/trace.jsonl`) and may contain private content; do not commit them.
 
-本机 trace 默认写入用户的应用数据目录（`JevAgent/trace.jsonl`），可能含私人内容，不要提交。
+## Code map and license
 
-## 代码位置
+- `agent.py`: think → choose → fill → execute → feedback, plus compact memory and retrieval.
+- `mcp_bridge.py`: MCP tool discovery, input schemas, and execution.
+- `growth.py`: missing-tool queue and review-only draft generation.
+- `web_ui.py` and `web_assets/`: local web interface and trace display.
+- `test_*.py` and `fake_mcp_server.py`: tests and a sample MCP server.
 
-- `agent.py`：LLM → Jev → 填参 → 执行 → 反馈的循环、短印象和回查。
-- `mcp_bridge.py`：从 MCP 协议读取工具、参数规范并执行调用。
-- `web_ui.py`、`web_assets/`：本地网页和执行记录。
-- `growth.py`：仅生成待审核的缺失工具草案。
-- `test_*.py`、`fake_mcp_server.py`：可修改的测试与模拟服务。
-
-## 许可证
-
-本项目采用 MIT 许可证，见 `LICENSE`。外部模型、MCP 服务和 Jev 依赖分别遵守各自许可证。
+This project is MIT-licensed; see `LICENSE`. External models, MCP servers, and Jev dependencies retain their own licenses.
