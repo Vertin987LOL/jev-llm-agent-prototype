@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jev · 意图到行动</title>
+  <link rel="stylesheet" href="/ui.css">
+  <script src="/ui.js" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-icon">J</span><span><strong>Jev</strong><small>意图到行动的桥梁</small></span></div>
+      <div class="section-label">运行空间</div>
+      <div class="side-card"><span id="model-label" class="eyebrow">LOCAL MODEL</span><strong id="model-name">Qwen 8B</strong><span class="subtle">想法 · 参数 · 回答</span></div>
+      <div class="side-card"><span class="eyebrow">DECISION ENGINE</span><strong>Jev</strong><span class="subtle">自然语言 → 固定动作</span></div>
+      <div class="section-label">当前目标</div>
+      <div class="goal-card"><div class="goal-top"><span class="status-dot"></span><span id="goal-status">尚无目标</span></div><p id="goal-text">说出任务，或先随便聊聊。</p><div class="goal-actions"><button id="resume-goal" class="quiet" disabled>继续目标</button><button id="stop-goal" class="quiet" disabled>结束目标</button></div></div>
+      <div class="section-label">心跳</div>
+      <div class="heartbeat-card"><div class="heartbeat-top"><div><strong>后台觉察</strong><span class="subtle">每 <span id="interval">60</span> 秒思考一次</span></div><button id="heartbeat-toggle" class="toggle" aria-label="切换心跳" aria-pressed="true"><span></span></button></div><div class="pending"><label for="pending-input">留下一件待办</label><div class="inline-form"><input id="pending-input" placeholder="例如：现在检查文件"><button id="pending-save">添加</button></div><p id="pending-text" class="subtle">暂无待办</p><div class="side-actions"><button id="heartbeat-once" class="quiet">现在心跳</button><button id="pending-clear" class="quiet">清除待办</button></div></div></div>
+      <div class="sidebar-bottom"><span class="status-dot online"></span><span>仅在本机运行 · 工具操作需确认</span></div>
+    </aside>
+
+    <main class="conversation">
+      <header class="topbar"><div><span class="eyebrow">AGENT WORKSPACE</span><h1>让想法，变成动作。</h1></div><div id="activity" class="activity"><span class="pulse"></span> 等待输入</div></header>
+      <section id="messages" class="messages" aria-live="polite"><div class="welcome"><div class="welcome-mark">✦</div><h2>你好，我是 Jev 的工作台</h2><p>语言模型负责形成想法，Jev 负责选择动作。每一步的来龙去脉都在右侧展开，不藏起来。</p><div class="suggestions"><button data-prompt="有哪些工具">看看有哪些工具 ↗</button><button data-prompt="列出当前目录中的文件">列出目录文件 ↗</button></div></div></section>
+      <footer class="composer"><div class="compose-top"><div class="mode-switch"><button data-mode="chat" class="active">聊天</button><button data-mode="goal">持续目标</button></div><span>Enter 发送 · Shift+Enter 换行</span></div><div class="compose-box"><textarea id="prompt" rows="2" placeholder="说出想法，或者描述你希望完成的事…"></textarea><button id="send" aria-label="发送">↑</button></div><p id="notice" class="notice"></p></footer>
+    </main>
+
+    <aside class="inspector"><div class="inspector-head"><span class="eyebrow">LIVE TRACE</span><h2>思考与执行</h2><p>事件实时出现。参数和原始结果可展开查看。</p></div><div id="trace" class="trace"><div class="trace-empty">还没有动作。<br>这里会记录每一次思考、决策和调用。</div></div><div class="inspector-bottom"><span class="status-dot"></span> 真实执行记录，不是模型编造的结果</div></aside>
+  </div>
+  <div id="approval-modal" class="modal" hidden><div class="modal-card"><span class="eyebrow">需要你的确认</span><h2>允许调用这个工具吗？</h2><p id="approval-tool"></p><pre id="approval-args"></pre><div class="modal-actions"><button id="deny">拒绝</button><button id="approve">允许这一次</button></div></div></div>
+</body>
+</html>

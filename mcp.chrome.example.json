@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "chrome": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "chrome-devtools-mcp@1.10.1",
+        "--headless",
+        "--isolated",
+        "--no-usage-statistics",
+        "--no-javascript-evaluation",
+        "--no-category-performance",
+        "--no-category-memory",
+        "--no-category-emulation",
+        "--no-category-network"
+      ],
+      "allowed_tools": ["new_page", "navigate_page", "list_pages", "take_snapshot", "fill", "press_key", "click", "wait_for", "list_console_messages"]
+    }
+  }
+}

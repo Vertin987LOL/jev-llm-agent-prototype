@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+mcp.json
+mcp.*.json
+!mcp.chrome.example.json
+trace.jsonl
+drafts/
+eval-*.json
+*-eval.json
+*.log
+*.sqlite*
+.pytest_cache/
